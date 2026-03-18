@@ -54,6 +54,15 @@
   }
   .header-user span { color: var(--accent); }
 
+  /* connection status dot */
+  .conn-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--border2); flex-shrink: 0;
+    transition: background 0.4s;
+  }
+  .conn-dot.live { background: #1a9c5a; }
+  .conn-dot.error { background: #c04020; }
+
   .messages {
     flex: 1; overflow-y: auto;
     padding: 20px;
@@ -187,6 +196,7 @@
     cursor: pointer; transition: opacity 0.15s; flex-shrink: 0;
   }
   .composer-send:hover { opacity: 0.85; }
+  .composer-send:disabled { opacity: 0.4; cursor: default; }
   .composer-send svg { width: 16px; height: 16px; }
 
   .url-bar {
@@ -239,6 +249,7 @@
 <div class="header">
   <span class="header-hash">#</span>
   <span class="header-name" id="header-name">general</span>
+  <div class="conn-dot" id="conn-dot" title="Connecting…"></div>
   <span class="header-user">viewing as <span id="header-user">alice</span></span>
   <button class="admin-dl" id="admin-dl" onclick="downloadJSON()" style="display:none">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -246,12 +257,14 @@
   </button>
 </div>
 
-<div class="messages" id="messages"></div>
+<div class="messages" id="messages">
+  <div class="empty"><div class="empty-hash">#</div>connecting…</div>
+</div>
 
 <div class="composer">
   <div class="composer-inner">
     <textarea class="composer-input" id="main-input" placeholder="Message #general…" rows="1"></textarea>
-    <button class="composer-send" onclick="sendMain()">
+    <button class="composer-send" id="send-btn" onclick="sendMain()" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
       </svg>
@@ -259,12 +272,33 @@
   </div>
 </div>
 
+<!-- Firebase SDK (compat version — works with simple global syntax) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <script>
+// ── Firebase config ────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCM1NrZ6wNoSyS73aeibz_JgL_s6Y7mI2g",
+  authDomain: "composeflow-5gxrn.firebaseapp.com",
+  databaseURL: "https://composeflow-5gxrn-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "composeflow-5gxrn",
+  storageBucket: "composeflow-5gxrn.firebasestorage.app",
+  messagingSenderId: "422678983278",
+  appId: "1:422678983278:web:8a994a6b2487b318582c7f"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ── App state ──────────────────────────────────────
 let currentChat = 'general';
 let currentUser = 'alice';
 let openReplyId = null;
-let lastSnapshot = '';
+let cachedMsgs = [];        // local copy kept in sync by onValue listener
+let currentListener = null; // reference to active Firebase listener so we can detach it
 
+// ── Colour palette ─────────────────────────────────
 const COLORS = [
   { bg: 'rgba(67,85,232,0.08)',  border: 'rgba(67,85,232,0.25)',  text: '#3444cc' },
   { bg: 'rgba(200,70,40,0.08)',  border: 'rgba(200,70,40,0.25)',  text: '#b03820' },
@@ -274,7 +308,6 @@ const COLORS = [
   { bg: 'rgba(10,130,170,0.08)', border: 'rgba(10,130,170,0.25)', text: '#086888' },
 ];
 const userColorMap = {};
-
 function colorFor(name) {
   if (!userColorMap[name]) {
     userColorMap[name] = COLORS[Object.keys(userColorMap).length % COLORS.length];
@@ -282,12 +315,8 @@ function colorFor(name) {
   return userColorMap[name];
 }
 
-function storageKey() { return 'chatlog_v3_' + currentChat; }
-function load() {
-  try { return JSON.parse(localStorage.getItem(storageKey())) || []; }
-  catch { return []; }
-}
-function save(msgs) { localStorage.setItem(storageKey(), JSON.stringify(msgs)); }
+// ── Helpers ────────────────────────────────────────
+function dbRef() { return db.ref('chats/' + currentChat); }
 
 function formatTime(ts) {
   const d = new Date(ts), now = new Date();
@@ -309,14 +338,22 @@ function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
+function setConnected(ok) {
+  const dot = document.getElementById('conn-dot');
+  dot.className = 'conn-dot ' + (ok ? 'live' : 'error');
+  dot.title = ok ? 'Live' : 'Connection error';
+  document.getElementById('send-btn').disabled = !ok;
+}
+
+// ── Build & render HTML from cached messages ───────
 function buildHTML(msgs) {
   if (!msgs.length) {
     return `<div class="empty"><div class="empty-hash">#</div>${currentChat}<div style="margin-top:4px;font-size:11px">no messages yet</div></div>`;
   }
-  return msgs.slice().sort((a,b) => b.ts - a.ts).map(msg => {
+  return msgs.slice().sort((a, b) => b.ts - a.ts).map(msg => {
     const isMine = msg.user === currentUser;
     const c = colorFor(msg.user);
-    const replies = (msg.replies || []).slice().sort((a,b) => a.ts - b.ts);
+    const replies = (msg.replies || []).slice().sort((a, b) => a.ts - b.ts);
 
     const repliesHTML = replies.length ? `
       <div class="replies">${replies.map(r => {
@@ -361,52 +398,82 @@ function buildHTML(msgs) {
   }).join('');
 }
 
-// ── Core render: only rebuilds if data changed, never interrupts a focused reply input ──
-function render(force) {
-  const msgs = load();
-  const snapshot = JSON.stringify(msgs);
-
-  // Never clobber a reply textarea that the user is actively typing in
+function render() {
+  // Never clobber a reply textarea the user is typing in
   const active = document.activeElement;
-  const replyFocused = active && active.classList.contains('reply-input');
-  if (!force && replyFocused) return;
+  if (active && active.classList.contains('reply-input')) return;
 
-  // Skip if nothing changed (protects main input typing too)
-  if (!force && snapshot === lastSnapshot) return;
-  lastSnapshot = snapshot;
+  document.getElementById('messages').innerHTML = buildHTML(cachedMsgs);
 
-  document.getElementById('messages').innerHTML = buildHTML(msgs);
-
-  // Restore focus to reply input if one was open
   if (openReplyId) {
     setTimeout(() => document.getElementById('ri-' + openReplyId)?.focus(), 20);
   }
 }
 
+// ── Firebase listener ──────────────────────────────
+// Called every time the current chat's data changes in Firebase.
+// Converts the Firebase object (keyed by push ID) into our flat array.
+function attachListener() {
+  // Detach any previous listener
+  if (currentListener) { currentListener.off(); }
+
+  const ref = dbRef();
+  currentListener = ref;
+
+  ref.on('value',
+    snapshot => {
+      setConnected(true);
+      const data = snapshot.val() || {};
+      // Convert {pushId: msgObject} → array, preserving replies array
+      cachedMsgs = Object.entries(data).map(([firebaseKey, msg]) => ({
+        id: firebaseKey,
+        user: msg.user,
+        text: msg.text,
+        ts: msg.ts,
+        replies: msg.replies ? Object.values(msg.replies) : []
+      }));
+      render();
+    },
+    err => {
+      console.error('Firebase error:', err);
+      setConnected(false);
+    }
+  );
+
+  // Monitor connection state
+  db.ref('.info/connected').on('value', snap => {
+    setConnected(snap.val() === true);
+  });
+}
+
+// ── Send main message ──────────────────────────────
 function sendMain() {
   const input = document.getElementById('main-input');
   const text = input.value.trim();
   if (!text) return;
-  const msgs = load();
-  msgs.push({
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    user: currentUser, text, ts: Date.now(), replies: []
+
+  // push() generates a unique Firebase key and writes the message
+  dbRef().push({
+    user: currentUser,
+    text: text,
+    ts: Date.now(),
+    replies: {}
   });
-  save(msgs);
+
   input.value = '';
   input.style.height = '';
-  render(true);
 }
 
+// ── Reply actions ──────────────────────────────────
 function toggleReply(id) {
   openReplyId = (openReplyId === id) ? null : id;
-  render(true);
+  render();
   if (openReplyId) setTimeout(() => document.getElementById('ri-' + openReplyId)?.focus(), 30);
 }
 
 function closeReply(id) {
   openReplyId = null;
-  render(true);
+  render();
 }
 
 function sendReply(id) {
@@ -414,26 +481,26 @@ function sendReply(id) {
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-  const msgs = load();
-  const msg = msgs.find(m => m.id === id);
-  if (!msg) return;
-  if (!msg.replies) msg.replies = [];
-  msg.replies.push({ user: currentUser, text, ts: Date.now() });
-  save(msgs);
-  openReplyId = id;  // keep box open
-  render(true);
-  // Clear the textarea after re-render recreates it
-  setTimeout(() => {
-    const ni = document.getElementById('ri-' + id);
-    if (ni) { ni.value = ''; ni.focus(); }
-  }, 30);
+
+  // Write the reply into chats/{chat}/{messageId}/replies/
+  dbRef().child(id + '/replies').push({
+    user: currentUser,
+    text: text,
+    ts: Date.now()
+  });
+
+  openReplyId = id;
+  // Clear the textarea immediately (Firebase will trigger re-render via onValue)
+  input.value = '';
+  input.style.height = '';
+  input.focus();
 }
 
 function replyKeydown(e, id) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(id); }
-  if (e.key === 'Escape') closeReply(id);
-}
+  if (e.key === 'Escape') closeReply(id); }
 
+// ── Auto-resize textareas ──────────────────────────
 document.addEventListener('input', e => {
   if (e.target.tagName === 'TEXTAREA') {
     e.target.style.height = 'auto';
@@ -445,6 +512,7 @@ document.getElementById('main-input').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMain(); }
 });
 
+// ── Context switching ──────────────────────────────
 function applyContext() {
   currentChat = document.getElementById('sim-chat').value.trim() || 'general';
   currentUser = document.getElementById('sim-user').value.trim() || 'anon';
@@ -456,31 +524,32 @@ function applyContext() {
   document.getElementById('admin-dl').style.display =
     currentUser.toLowerCase() === 'admin' ? 'flex' : 'none';
   openReplyId = null;
-  lastSnapshot = '';
-  render(true);
+  cachedMsgs = [];
+  document.getElementById('messages').innerHTML =
+    `<div class="empty"><div class="empty-hash">#</div>connecting…</div>`;
+  attachListener(); // re-subscribe to the new chat path
 }
 
+// ── Admin export ───────────────────────────────────
 function downloadJSON() {
-  const msgs = load().slice().sort((a, b) => a.ts - b.ts);
+  const msgs = cachedMsgs.slice().sort((a, b) => a.ts - b.ts);
   const payload = { chat: currentChat, exported: new Date().toISOString(), messages: msgs };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = currentChat + '_' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = currentChat + '_' + new Date().toISOString().slice(0, 10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
 }
 
-(function() {
+// ── Init: read query string, then connect ──────────
+(function () {
   const p = new URLSearchParams(window.location.search);
   if (p.get('chat')) { currentChat = p.get('chat'); document.getElementById('sim-chat').value = currentChat; }
   if (p.get('user')) { currentUser = p.get('user'); document.getElementById('sim-user').value = currentUser; }
   applyContext();
 })();
-
-// Poll — skips re-render if reply input is focused or data hasn't changed
-setInterval(() => render(false), 2000);
 </script>
 </body>
 </html>
