@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f4f2;
+    --surface: #ffffff;
+    --surface2: #efefed;
+    --border: #e0dedd;
+    --border2: #d0cfcd;
+    --text: #1a1a1a;
+    --text2: #6b6b6b;
+    --text3: #aaaaaa;
+    --accent: #4355e8;
+    --accent-dim: rgba(67,85,232,0.08);
+    --accent-border: rgba(67,85,232,0.25);
+    --mine: #eef0fd;
+    --mine-border: rgba(67,85,232,0.2);
+    --reply-line: #e0dedd;
+    --font: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .header-hash { font-family: var(--mono); font-size: 18px; color: var(--accent); font-weight: 500; }
+  .header-name { font-size: 15px; font-weight: 500; color: var(--text); flex: 1; }
+  .header-user {
+    font-family: var(--mono); font-size: 11px; color: var(--text2);
+    background: var(--surface2); border: 1px solid var(--border2);
+    padding: 3px 10px; border-radius: 20px;
+  }
+  .header-user span { color: var(--accent); }
+
+  .messages {
+    flex: 1; overflow-y: auto;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 2px;
+    scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+  }
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .thread {
+    display: flex; flex-direction: column;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .thread:last-child { border-bottom: none; }
+
+  .msg-row { display: flex; gap: 10px; align-items: flex-start; }
+
+  .avatar {
+    width: 30px; height: 30px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    flex-shrink: 0; margin-top: 1px; text-transform: uppercase;
+  }
+
+  .msg-body { flex: 1; min-width: 0; }
+  .msg-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .msg-author { font-size: 12px; font-weight: 500; font-family: var(--mono); }
+  .msg-time { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+
+  .msg-bubble {
+    font-size: 14px; line-height: 1.6; color: var(--text);
+    padding: 8px 12px;
+    border-radius: 4px 10px 10px 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    display: inline-block; max-width: 100%; word-break: break-word;
+  }
+
+  .msg-row.mine .msg-bubble {
+    background: var(--mine); border-color: var(--mine-border);
+    border-radius: 10px 4px 10px 10px;
+  }
+  .msg-row.mine .avatar { background: var(--accent-dim); border: 1px solid var(--accent-border); }
+
+  .msg-actions { margin-top: 5px; padding-left: 2px; }
+  .reply-btn {
+    font-family: var(--mono); font-size: 10px; color: var(--text3);
+    background: none; border: none; cursor: pointer;
+    padding: 2px 0; letter-spacing: 0.03em; transition: color 0.15s;
+  }
+  .reply-btn:hover { color: var(--accent); }
+  .reply-btn.active { color: var(--accent); }
+
+  .replies {
+    margin-top: 8px; margin-left: 40px;
+    display: flex; flex-direction: column; gap: 8px;
+    padding-left: 14px; border-left: 2px solid var(--reply-line);
+  }
+  .reply-row { display: flex; gap: 8px; align-items: flex-start; }
+  .reply-row .avatar { width: 22px; height: 22px; font-size: 9px; border-radius: 4px; }
+  .reply-row .msg-bubble { font-size: 13px; padding: 6px 10px; border-radius: 4px 8px 8px 8px; }
+  .reply-row.mine .msg-bubble { background: var(--mine); border-color: var(--mine-border); border-radius: 8px 4px 8px 8px; }
+  .reply-row .msg-author { font-size: 11px; }
+
+  .reply-composer {
+    margin-top: 8px; margin-left: 40px;
+    padding-left: 14px;
+    border-left: 2px solid var(--accent-border);
+    display: none;
+  }
+  .reply-composer.open { display: block; }
+  .reply-composer-inner { display: flex; gap: 8px; align-items: flex-end; }
+
+  .reply-input {
+    flex: 1;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 7px 11px;
+    font-family: var(--font); font-size: 13px; color: var(--text);
+    resize: none; outline: none;
+    min-height: 36px; max-height: 120px; overflow-y: auto;
+    transition: border-color 0.15s; line-height: 1.5;
+  }
+  .reply-input:focus { border-color: var(--accent-border); }
+  .reply-input::placeholder { color: var(--text3); }
+
+  .reply-send {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 6px; padding: 7px 14px;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: opacity 0.15s; white-space: nowrap; flex-shrink: 0;
+  }
+  .reply-send:hover { opacity: 0.85; }
+
+  .reply-cancel {
+    background: none; border: 1px solid var(--border2); color: var(--text2);
+    border-radius: 6px; padding: 7px 10px;
+    font-family: var(--mono); font-size: 11px;
+    cursor: pointer; transition: color 0.15s; flex-shrink: 0;
+  }
+  .reply-cancel:hover { color: var(--text); }
+
+  .empty {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px; color: var(--text3);
+    font-family: var(--mono); font-size: 13px;
+  }
+  .empty-hash { font-size: 32px; color: var(--border2); margin-bottom: 4px; }
+
+  .composer {
+    border-top: 1px solid var(--border);
+    padding: 14px 20px;
+    background: var(--surface); flex-shrink: 0;
+  }
+  .composer-inner { display: flex; gap: 10px; align-items: flex-end; }
+  .composer-input {
+    flex: 1;
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 10px 14px;
+    font-family: var(--font); font-size: 14px; color: var(--text);
+    resize: none; outline: none;
+    min-height: 42px; max-height: 160px; overflow-y: auto;
+    transition: border-color 0.15s; line-height: 1.5;
+  }
+  .composer-input:focus { border-color: var(--accent-border); }
+  .composer-input::placeholder { color: var(--text3); }
+  .composer-send {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 8px; width: 42px; height: 42px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: opacity 0.15s; flex-shrink: 0;
+  }
+  .composer-send:hover { opacity: 0.85; }
+  .composer-send svg { width: 16px; height: 16px; }
+
+  .url-bar {
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+    padding: 8px 20px;
+    display: flex; gap: 8px; align-items: center;
+    flex-shrink: 0; flex-wrap: wrap;
+  }
+  .url-bar label { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+  .url-bar input {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 3px 8px; color: var(--text);
+    outline: none; width: 90px;
+  }
+  .url-bar input:focus { border-color: var(--accent-border); }
+  .url-bar button {
+    font-family: var(--mono); font-size: 10px;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 4px; color: var(--text2);
+    padding: 3px 10px; cursor: pointer; transition: color 0.15s;
+  }
+  .url-bar button:hover { color: var(--accent); border-color: var(--accent-border); }
+  .url-display { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-left: auto; }
+  .url-display span { color: var(--accent); }
+
+  .admin-dl {
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    color: #0f7a44;
+    background: rgba(20,140,80,0.08);
+    border: 1px solid rgba(20,140,80,0.25);
+    border-radius: 6px; padding: 4px 10px;
+    cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
+  }
+  .admin-dl:hover { opacity: 0.75; }
+</style>
+</head>
+<body>
+
+<div class="url-bar">
+  <label>chat</label>
+  <input id="sim-chat" value="general" maxlength="30">
+  <label>user</label>
+  <input id="sim-user" value="alice" maxlength="20">
+  <button onclick="applyContext()">apply</button>
+  <div class="url-display" id="url-display">?chat=<span>general</span>&amp;user=<span>alice</span></div>
+</div>
+
+<div class="header">
+  <span class="header-hash">#</span>
+  <span class="header-name" id="header-name">general</span>
+  <span class="header-user">viewing as <span id="header-user">alice</span></span>
+  <button class="admin-dl" id="admin-dl" onclick="downloadJSON()" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    export JSON
+  </button>
+</div>
+
+<div class="messages" id="messages"></div>
+
+<div class="composer">
+  <div class="composer-inner">
+    <textarea class="composer-input" id="main-input" placeholder="Message #general…" rows="1"></textarea>
+    <button class="composer-send" onclick="sendMain()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+let currentChat = 'general';
+let currentUser = 'alice';
+let openReplyId = null;
+let lastSnapshot = '';
+
+const COLORS = [
+  { bg: 'rgba(67,85,232,0.08)',  border: 'rgba(67,85,232,0.25)',  text: '#3444cc' },
+  { bg: 'rgba(200,70,40,0.08)',  border: 'rgba(200,70,40,0.25)',  text: '#b03820' },
+  { bg: 'rgba(20,140,80,0.08)',  border: 'rgba(20,140,80,0.25)',  text: '#0f7a44' },
+  { bg: 'rgba(140,50,170,0.08)', border: 'rgba(140,50,170,0.25)', text: '#7a2a99' },
+  { bg: 'rgba(180,120,10,0.08)', border: 'rgba(180,120,10,0.25)', text: '#906008' },
+  { bg: 'rgba(10,130,170,0.08)', border: 'rgba(10,130,170,0.25)', text: '#086888' },
+];
+const userColorMap = {};
+
+function colorFor(name) {
+  if (!userColorMap[name]) {
+    userColorMap[name] = COLORS[Object.keys(userColorMap).length % COLORS.length];
+  }
+  return userColorMap[name];
+}
+
+function storageKey() { return 'chatlog_v3_' + currentChat; }
+function load() {
+  try { return JSON.parse(localStorage.getItem(storageKey())) || []; }
+  catch { return []; }
+}
+function save(msgs) { localStorage.setItem(storageKey(), JSON.stringify(msgs)); }
+
+function formatTime(ts) {
+  const d = new Date(ts), now = new Date();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === now.toDateString()
+    ? time
+    : d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' + time;
+}
+
+function avatarHTML(name, size) {
+  const c = colorFor(name);
+  const s = size === 'sm'
+    ? 'width:22px;height:22px;font-size:9px;border-radius:4px;'
+    : 'width:30px;height:30px;font-size:11px;border-radius:6px;';
+  return `<div class="avatar" style="${s}background:${c.bg};border:1px solid ${c.border};color:${c.text}">${name.slice(0,2)}</div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function buildHTML(msgs) {
+  if (!msgs.length) {
+    return `<div class="empty"><div class="empty-hash">#</div>${currentChat}<div style="margin-top:4px;font-size:11px">no messages yet</div></div>`;
+  }
+  return msgs.slice().sort((a,b) => b.ts - a.ts).map(msg => {
+    const isMine = msg.user === currentUser;
+    const c = colorFor(msg.user);
+    const replies = (msg.replies || []).slice().sort((a,b) => a.ts - b.ts);
+
+    const repliesHTML = replies.length ? `
+      <div class="replies">${replies.map(r => {
+        const rMine = r.user === currentUser;
+        return `<div class="reply-row ${rMine ? 'mine' : 'theirs'}">
+          ${avatarHTML(r.user, 'sm')}
+          <div class="msg-body">
+            <div class="msg-meta">
+              <span class="msg-author" style="color:${colorFor(r.user).text}">${r.user}</span>
+              <span class="msg-time">${formatTime(r.ts)}</span>
+            </div>
+            <div class="msg-bubble">${escHtml(r.text)}</div>
+          </div>
+        </div>`;
+      }).join('')}</div>` : '';
+
+    const isOpen = openReplyId === msg.id;
+    return `<div class="thread" id="thread-${msg.id}">
+      <div class="msg-row ${isMine ? 'mine' : 'theirs'}">
+        ${avatarHTML(msg.user, 'lg')}
+        <div class="msg-body">
+          <div class="msg-meta">
+            <span class="msg-author" style="color:${c.text}">${msg.user}</span>
+            <span class="msg-time">${formatTime(msg.ts)}</span>
+          </div>
+          <div class="msg-bubble">${escHtml(msg.text)}</div>
+          <div class="msg-actions">
+            <button class="reply-btn ${isOpen ? 'active' : ''}" onclick="toggleReply('${msg.id}')">↩ reply</button>
+          </div>
+        </div>
+      </div>
+      ${repliesHTML}
+      <div class="reply-composer ${isOpen ? 'open' : ''}" id="rc-${msg.id}">
+        <div class="reply-composer-inner">
+          <textarea class="reply-input" id="ri-${msg.id}" placeholder="Reply to ${msg.user}…" rows="1"
+            onkeydown="replyKeydown(event,'${msg.id}')"></textarea>
+          <button class="reply-cancel" onclick="closeReply('${msg.id}')">cancel</button>
+          <button class="reply-send" onclick="sendReply('${msg.id}')">reply</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Core render: only rebuilds if data changed, never interrupts a focused reply input ──
+function render(force) {
+  const msgs = load();
+  const snapshot = JSON.stringify(msgs);
+
+  // Never clobber a reply textarea that the user is actively typing in
+  const active = document.activeElement;
+  const replyFocused = active && active.classList.contains('reply-input');
+  if (!force && replyFocused) return;
+
+  // Skip if nothing changed (protects main input typing too)
+  if (!force && snapshot === lastSnapshot) return;
+  lastSnapshot = snapshot;
+
+  document.getElementById('messages').innerHTML = buildHTML(msgs);
+
+  // Restore focus to reply input if one was open
+  if (openReplyId) {
+    setTimeout(() => document.getElementById('ri-' + openReplyId)?.focus(), 20);
+  }
+}
+
+function sendMain() {
+  const input = document.getElementById('main-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const msgs = load();
+  msgs.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    user: currentUser, text, ts: Date.now(), replies: []
+  });
+  save(msgs);
+  input.value = '';
+  input.style.height = '';
+  render(true);
+}
+
+function toggleReply(id) {
+  openReplyId = (openReplyId === id) ? null : id;
+  render(true);
+  if (openReplyId) setTimeout(() => document.getElementById('ri-' + openReplyId)?.focus(), 30);
+}
+
+function closeReply(id) {
+  openReplyId = null;
+  render(true);
+}
+
+function sendReply(id) {
+  const input = document.getElementById('ri-' + id);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  const msgs = load();
+  const msg = msgs.find(m => m.id === id);
+  if (!msg) return;
+  if (!msg.replies) msg.replies = [];
+  msg.replies.push({ user: currentUser, text, ts: Date.now() });
+  save(msgs);
+  openReplyId = id;  // keep box open
+  render(true);
+  // Clear the textarea after re-render recreates it
+  setTimeout(() => {
+    const ni = document.getElementById('ri-' + id);
+    if (ni) { ni.value = ''; ni.focus(); }
+  }, 30);
+}
+
+function replyKeydown(e, id) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(id); }
+  if (e.key === 'Escape') closeReply(id);
+}
+
+document.addEventListener('input', e => {
+  if (e.target.tagName === 'TEXTAREA') {
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+  }
+});
+
+document.getElementById('main-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMain(); }
+});
+
+function applyContext() {
+  currentChat = document.getElementById('sim-chat').value.trim() || 'general';
+  currentUser = document.getElementById('sim-user').value.trim() || 'anon';
+  document.getElementById('header-name').textContent = currentChat;
+  document.getElementById('header-user').textContent = currentUser;
+  document.getElementById('main-input').placeholder = 'Message #' + currentChat + '…';
+  document.getElementById('url-display').innerHTML =
+    '?chat=<span>' + currentChat + '</span>&amp;user=<span>' + currentUser + '</span>';
+  document.getElementById('admin-dl').style.display =
+    currentUser.toLowerCase() === 'admin' ? 'flex' : 'none';
+  openReplyId = null;
+  lastSnapshot = '';
+  render(true);
+}
+
+function downloadJSON() {
+  const msgs = load().slice().sort((a, b) => a.ts - b.ts);
+  const payload = { chat: currentChat, exported: new Date().toISOString(), messages: msgs };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = currentChat + '_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+(function() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('chat')) { currentChat = p.get('chat'); document.getElementById('sim-chat').value = currentChat; }
+  if (p.get('user')) { currentUser = p.get('user'); document.getElementById('sim-user').value = currentUser; }
+  applyContext();
+})();
+
+// Poll — skips re-render if reply input is focused or data hasn't changed
+setInterval(() => render(false), 2000);
+</script>
+</body>
+</html>
