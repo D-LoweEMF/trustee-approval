@@ -399,9 +399,9 @@ function buildHTML(msgs) {
 }
 
 function render() {
-  // Never clobber a reply textarea the user is typing in
+  // Only block re-render if the user is actively mid-type in a reply box
   const active = document.activeElement;
-  if (active && active.classList.contains('reply-input')) return;
+  if (active && active.classList.contains('reply-input') && active.value.trim().length > 0) return;
 
   document.getElementById('messages').innerHTML = buildHTML(cachedMsgs);
 
@@ -497,8 +497,13 @@ function sendReply(id) {
 }
 
 function replyKeydown(e, id) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(id); }
-  if (e.key === 'Escape') closeReply(id); }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    e.target.blur(); // release focus so the render guard doesn't block the update
+    sendReply(id);
+  }
+  if (e.key === 'Escape') closeReply(id);
+}
 
 // ── Auto-resize textareas ──────────────────────────
 document.addEventListener('input', e => {
