@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Board Approval — Data Entry</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f4f2;
+    --surface: #ffffff;
+    --surface2: #efefed;
+    --border: #e0dedd;
+    --border2: #d0cfcd;
+    --text: #1a1a1a;
+    --text2: #6b6b6b;
+    --text3: #aaaaaa;
+    --accent: #4355e8;
+    --accent-dim: rgba(67,85,232,0.08);
+    --accent-border: rgba(67,85,232,0.25);
+    --green: #0f7a44;
+    --green-bg: rgba(20,140,80,0.08);
+    --green-border: rgba(20,140,80,0.25);
+    --red: #b03820;
+    --red-bg: rgba(200,70,40,0.08);
+    --red-border: rgba(200,70,40,0.25);
+    --font: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .topbar-logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .topbar-wordmark {
+    font-family: var(--font);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #1a2a4a;
+    line-height: 1.3;
+  }
+  .topbar-sep {
+    width: 1px; height: 20px; background: var(--border2);
+  }
+  .topbar-title {
+    font-size: 13px; font-weight: 500; color: var(--text2);
+  }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .conn-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--border2); flex-shrink: 0;
+    transition: background 0.4s;
+  }
+  .conn-dot.live { background: #1a9c5a; }
+  .conn-dot.error { background: #c04020; }
+  .conn-label { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+  /* ── Chat selector bar ── */
+  .chat-bar {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .chat-bar label { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+  .chat-bar input[type="text"] {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 6px 12px; color: var(--text);
+    outline: none; width: 160px;
+    transition: border-color 0.15s;
+  }
+  .chat-bar input[type="text"]:focus { border-color: var(--accent-border); }
+  .btn-load {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--text2);
+    padding: 6px 14px; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-load:hover { color: var(--accent); border-color: var(--accent-border); }
+
+  .chat-status {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text3);
+    margin-left: 4px;
+  }
+  .chat-status.found { color: var(--green); }
+  .chat-status.empty { color: var(--text3); }
+
+  /* ── Main layout ── */
+  .main {
+    flex: 1;
+    display: flex;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* ── Form panel ── */
+  .form-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+    scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+  }
+  .form-panel::-webkit-scrollbar { width: 4px; }
+  .form-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .form-section-title {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--text3); margin-bottom: 16px; margin-top: 28px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .form-section-title:first-child { margin-top: 0; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 4px;
+  }
+  .form-grid.single { grid-template-columns: 1fr; }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field label {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .field input[type="text"],
+  .field textarea,
+  .field select {
+    font-family: var(--font); font-size: 13px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 8px 12px;
+    outline: none; width: 100%;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+  .field textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+
+  /* Urgent toggle */
+  .urgent-toggle {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 2px;
+  }
+  .toggle-track {
+    position: relative; width: 36px; height: 20px;
+    background: var(--border2); border-radius: 10px;
+    cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-track.on { background: var(--red); }
+  .toggle-track::after {
+    content: ''; position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px; border-radius: 7px;
+    background: white; transition: transform 0.2s;
+  }
+  .toggle-track.on::after { transform: translateX(16px); }
+  #urgent-hidden { display: none; }
+  .urgent-toggle label { font-size: 13px; color: var(--text); cursor: pointer; user-select: none; }
+  .urgent-badge {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    padding: 2px 8px; border-radius: 10px;
+    display: none;
+    background: var(--red-bg); border: 1px solid var(--red-border); color: var(--red);
+  }
+  .urgent-badge.visible { display: inline-block; }
+
+  /* Actions bar */
+  .actions-bar {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .btn-save {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 8px; padding: 10px 24px;
+    cursor: pointer; transition: opacity 0.15s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .btn-save:hover { opacity: 0.85; }
+  .btn-save:disabled { opacity: 0.4; cursor: default; }
+  .btn-clear {
+    font-family: var(--mono); font-size: 12px;
+    background: none; border: 1px solid var(--border2); color: var(--text2);
+    border-radius: 8px; padding: 10px 18px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-clear:hover { color: var(--red); border-color: var(--red-border); }
+
+  .save-status {
+    font-family: var(--mono); font-size: 11px;
+    padding: 6px 14px; border-radius: 6px;
+    display: none;
+  }
+  .save-status.success {
+    display: block;
+    background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green);
+  }
+  .save-status.error {
+    display: block;
+    background: var(--red-bg); border: 1px solid var(--red-border); color: var(--red);
+  }
+
+  /* ── Preview panel ── */
+  .preview-panel {
+    width: 340px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-left: 1px solid var(--border2);
+    overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+  }
+  .preview-panel::-webkit-scrollbar { width: 4px; }
+  .preview-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .preview-inner {
+    padding: 32px 28px 48px;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #111;
+  }
+
+  .preview-logo {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 32px;
+  }
+  .preview-wordmark {
+    font-family: var(--font); font-size: 8px; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: #1a2a4a; line-height: 1.3;
+  }
+  .preview-title {
+    text-align: center;
+    font-size: 13px; font-weight: bold; text-decoration: underline;
+    margin-bottom: 20px; color: #111;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+  .preview-field { margin-bottom: 10px; font-size: 12.5px; color: #111; }
+  .preview-field strong { font-weight: bold; }
+  .preview-val { color: #111; }
+  .preview-val.empty { color: #bbb; font-style: italic; }
+  .preview-divider { border: none; border-top: 1px solid #ccc; margin: 18px 0; }
+  .preview-section {
+    font-size: 12.5px; font-weight: bold; text-decoration: underline;
+    margin-top: 20px; margin-bottom: 12px; color: #111;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+  .preview-urgent { font-weight: bold; font-size: 12.5px; margin-bottom: 18px; display: none; }
+  .preview-urgent.visible { display: block; }
+
+  .preview-header-bar {
+    font-family: var(--mono); font-size: 9px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--text3); padding: 10px 28px 6px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .preview-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--border2);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .open-chat-link {
+    display: block;
+    margin-top: 20px;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--accent); text-decoration: none;
+    text-align: center;
+    padding: 8px;
+    border: 1px solid var(--accent-border);
+    border-radius: 6px;
+    background: var(--accent-dim);
+    transition: opacity 0.15s;
+  }
+  .open-chat-link:hover { opacity: 0.75; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <svg width="32" height="32" viewBox="0 0 52 52" fill="none">
+      <circle cx="26" cy="26" r="24.5" stroke="#1a2a4a" stroke-width="2.2" fill="none"/>
+      <circle cx="26" cy="26" r="17" stroke="#1a2a4a" stroke-width="1.4" fill="none"/>
+      <circle cx="26" cy="26" r="9" fill="#1a2a4a"/>
+      <circle cx="26" cy="26" r="5.5" fill="white"/>
+      <path d="M 19 4.5 A 24.5 24.5 0 0 1 33 4.5" stroke="white" stroke-width="3" fill="none"/>
+    </svg>
+    <div class="topbar-wordmark">Ellen MacArthur<br>Foundation</div>
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-title">Board Approval — Data Entry</div>
+  <div class="topbar-right">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span class="conn-label" id="conn-label">connecting…</span>
+  </div>
+</div>
+
+<!-- Chat selector bar -->
+<div class="chat-bar">
+  <label>Chat ID</label>
+  <input type="text" id="chat-id" value="general" placeholder="e.g. amazon-q2" maxlength="60">
+  <button class="btn-load" onclick="loadChat()">Load</button>
+  <span class="chat-status" id="chat-status"></span>
+</div>
+
+<!-- Main content -->
+<div class="main">
+
+  <!-- ── Form ── -->
+  <div class="form-panel">
+
+    <div class="form-section-title">Approval Details</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Type</label>
+        <input type="text" id="f-type" placeholder="e.g. Income">
+      </div>
+      <div class="field">
+        <label>Payment Type</label>
+        <input type="text" id="f-paymentType" placeholder="e.g. Type A">
+      </div>
+      <div class="field">
+        <label>Payment Amount</label>
+        <input type="text" id="f-paymentAmount" placeholder="e.g. 123,456 GBP">
+      </div>
+      <div class="field">
+        <label>Decision Required By</label>
+        <input type="text" id="f-decisionBy" placeholder="e.g. 03/26/2026">
+      </div>
+    </div>
+
+    <div class="form-grid single" style="margin-top:16px">
+      <div class="field">
+        <label>Reason for Escalation to Board</label>
+        <input type="text" id="f-escalationReason" placeholder="e.g. Exceeds delegated authority">
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="urgent-toggle" onclick="toggleUrgent()">
+        <div class="toggle-track" id="urgent-track"></div>
+        <label>Mark as <strong>Urgent</strong></label>
+        <span class="urgent-badge" id="urgent-badge">URGENT</span>
+      </div>
+    </div>
+
+    <div class="form-section-title">Summary of Business Opportunity</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Organisation Name</label>
+        <input type="text" id="f-orgName" placeholder="e.g. Amazon">
+      </div>
+      <div class="field">
+        <label>Organisation Type</label>
+        <input type="text" id="f-orgType" placeholder="e.g. Partner">
+      </div>
+      <div class="field">
+        <label>Jurisdiction</label>
+        <input type="text" id="f-jurisdiction" placeholder="e.g. North America">
+      </div>
+    </div>
+
+    <div class="form-grid single" style="margin-top:16px">
+      <div class="field">
+        <label>Organisation Overview / Business Description</label>
+        <textarea id="f-orgOverview" placeholder="Brief description of the organisation…"></textarea>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Opportunity Overview</label>
+        <textarea id="f-opportunityOverview" placeholder="Summary of the opportunity…"></textarea>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Focus Area / Strategic Link</label>
+        <textarea id="f-focusArea" placeholder="How this links to EMF strategy…"></textarea>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Due Diligence</label>
+        <textarea id="f-dueDiligence" placeholder="Due diligence notes…"></textarea>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Contractual</label>
+        <textarea id="f-contractual" placeholder="Contractual information…"></textarea>
+      </div>
+    </div>
+
+    <div class="actions-bar">
+      <button class="btn-save" id="btn-save" onclick="saveData()" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save to Firebase
+      </button>
+      <button class="btn-clear" onclick="clearForm()">Clear form</button>
+      <span class="save-status" id="save-status"></span>
+    </div>
+
+  </div>
+
+  <!-- ── Live Preview ── -->
+  <div class="preview-panel">
+    <div class="preview-header-bar">
+      <div class="preview-dot"></div>
+      Live preview
+    </div>
+    <div class="preview-inner">
+
+      <div class="preview-logo">
+        <svg width="36" height="36" viewBox="0 0 52 52" fill="none">
+          <circle cx="26" cy="26" r="24.5" stroke="#1a2a4a" stroke-width="2.2" fill="none"/>
+          <circle cx="26" cy="26" r="17" stroke="#1a2a4a" stroke-width="1.4" fill="none"/>
+          <circle cx="26" cy="26" r="9" fill="#1a2a4a"/>
+          <circle cx="26" cy="26" r="5.5" fill="white"/>
+          <path d="M 19 4.5 A 24.5 24.5 0 0 1 33 4.5" stroke="white" stroke-width="3" fill="none"/>
+        </svg>
+        <div class="preview-wordmark">Ellen MacArthur<br>Foundation</div>
+      </div>
+
+      <div class="preview-title">Request for Board Approval</div>
+
+      <div class="preview-field"><strong>Type:</strong> <span class="preview-val" id="p-type"></span></div>
+      <div class="preview-field"><strong>Payment type:</strong> <span class="preview-val" id="p-paymentType"></span></div>
+      <div class="preview-field"><strong>Payment amount:</strong> <span class="preview-val" id="p-paymentAmount"></span></div>
+      <div class="preview-field"><strong>Reason for escalation to Board:</strong> <span class="preview-val" id="p-escalationReason"></span></div>
+      <div class="preview-field"><strong>Decision required by:</strong> <span class="preview-val" id="p-decisionBy"></span></div>
+      <div class="preview-urgent" id="p-urgent">Urgent!</div>
+
+      <hr class="preview-divider">
+
+      <div class="preview-section">Summary of Business Opportunity</div>
+
+      <div class="preview-field"><strong>Organisation name:</strong> <span class="preview-val" id="p-orgName"></span></div>
+      <div class="preview-field"><strong>Organisation type:</strong> <span class="preview-val" id="p-orgType"></span></div>
+      <div class="preview-field"><strong>Jurisdiction:</strong> <span class="preview-val" id="p-jurisdiction"></span></div>
+      <div class="preview-field"><strong>Org overview:</strong> <span class="preview-val" id="p-orgOverview"></span></div>
+      <div class="preview-field"><strong>Overview:</strong> <span class="preview-val" id="p-opportunityOverview"></span></div>
+      <div class="preview-field"><strong>Focus area:</strong> <span class="preview-val" id="p-focusArea"></span></div>
+      <div class="preview-field"><strong>Due Diligence:</strong> <span class="preview-val" id="p-dueDiligence"></span></div>
+      <div class="preview-field"><strong>Contractual:</strong> <span class="preview-val" id="p-contractual"></span></div>
+
+      <a class="open-chat-link" id="open-chat-link" href="chat.html?chat=general" target="_blank">
+        → Open chat: general
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCM1NrZ6wNoSyS73aeibz_JgL_s6Y7mI2g",
+  authDomain: "composeflow-5gxrn.firebaseapp.com",
+  databaseURL: "https://composeflow-5gxrn-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "composeflow-5gxrn",
+  storageBucket: "composeflow-5gxrn.firebasestorage.app",
+  messagingSenderId: "422678983278",
+  appId: "1:422678983278:web:8a994a6b2487b318582c7f"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ── Connection state ───────────────────────────────
+db.ref('.info/connected').on('value', snap => {
+  const ok = snap.val() === true;
+  document.getElementById('conn-dot').className = 'conn-dot ' + (ok ? 'live' : 'error');
+  document.getElementById('conn-label').textContent = ok ? 'connected' : 'offline';
+  document.getElementById('btn-save').disabled = !ok;
+});
+
+// ── Urgent toggle ──────────────────────────────────
+let isUrgent = false;
+function toggleUrgent() {
+  isUrgent = !isUrgent;
+  document.getElementById('urgent-track').classList.toggle('on', isUrgent);
+  document.getElementById('urgent-badge').classList.toggle('visible', isUrgent);
+  document.getElementById('p-urgent').classList.toggle('visible', isUrgent);
+}
+
+// ── Field map: formId → previewId ─────────────────
+const FIELDS = [
+  ['f-type',                'p-type',                'type'],
+  ['f-paymentType',         'p-paymentType',         'paymentType'],
+  ['f-paymentAmount',       'p-paymentAmount',       'paymentAmount'],
+  ['f-escalationReason',    'p-escalationReason',    'escalationReason'],
+  ['f-decisionBy',          'p-decisionBy',          'decisionBy'],
+  ['f-orgName',             'p-orgName',             'orgName'],
+  ['f-orgType',             'p-orgType',             'orgType'],
+  ['f-jurisdiction',        'p-jurisdiction',        'jurisdiction'],
+  ['f-orgOverview',         'p-orgOverview',         'orgOverview'],
+  ['f-opportunityOverview', 'p-opportunityOverview', 'opportunityOverview'],
+  ['f-focusArea',           'p-focusArea',           'focusArea'],
+  ['f-dueDiligence',        'p-dueDiligence',        'dueDiligence'],
+  ['f-contractual',         'p-contractual',         'contractual'],
+];
+
+// ── Live preview sync ──────────────────────────────
+function syncPreview() {
+  FIELDS.forEach(([fId, pId]) => {
+    const val = document.getElementById(fId).value.trim();
+    const el = document.getElementById(pId);
+    if (val) {
+      el.textContent = val;
+      el.classList.remove('empty');
+    } else {
+      el.textContent = '—';
+      el.classList.add('empty');
+    }
+  });
+}
+
+// Attach live preview listeners
+FIELDS.forEach(([fId]) => {
+  document.getElementById(fId).addEventListener('input', syncPreview);
+});
+
+// ── Load existing data ─────────────────────────────
+function loadChat() {
+  const chatId = document.getElementById('chat-id').value.trim();
+  if (!chatId) return;
+
+  const statusEl = document.getElementById('chat-status');
+  statusEl.textContent = 'loading…'; statusEl.className = 'chat-status';
+
+  db.ref('boardApprovals/' + chatId).once('value').then(snap => {
+    const data = snap.val();
+    if (data) {
+      FIELDS.forEach(([fId,, key]) => {
+        const el = document.getElementById(fId);
+        el.value = data[key] || '';
+      });
+      isUrgent = !!data.urgent;
+      document.getElementById('urgent-track').classList.toggle('on', isUrgent);
+      document.getElementById('urgent-badge').classList.toggle('visible', isUrgent);
+      document.getElementById('p-urgent').classList.toggle('visible', isUrgent);
+      statusEl.textContent = '✓ record loaded'; statusEl.className = 'chat-status found';
+    } else {
+      clearForm();
+      statusEl.textContent = 'no record yet — form cleared'; statusEl.className = 'chat-status empty';
+    }
+    syncPreview();
+    updateChatLink();
+  });
+}
+
+// ── Update chat link in preview ────────────────────
+function updateChatLink() {
+  const chatId = document.getElementById('chat-id').value.trim() || 'general';
+  const link = document.getElementById('open-chat-link');
+  link.href = 'chat.html?chat=' + encodeURIComponent(chatId);
+  link.textContent = '→ Open chat: ' + chatId;
+}
+document.getElementById('chat-id').addEventListener('input', updateChatLink);
+
+// ── Save to Firebase ───────────────────────────────
+function saveData() {
+  const chatId = document.getElementById('chat-id').value.trim();
+  if (!chatId) { alert('Please enter a Chat ID first.'); return; }
+
+  const payload = { urgent: isUrgent };
+  FIELDS.forEach(([fId,, key]) => {
+    payload[key] = document.getElementById(fId).value.trim();
+  });
+
+  const statusEl = document.getElementById('save-status');
+  statusEl.className = 'save-status'; statusEl.textContent = '';
+
+  db.ref('boardApprovals/' + chatId).set(payload)
+    .then(() => {
+      statusEl.textContent = '✓ Saved successfully';
+      statusEl.className = 'save-status success';
+      document.getElementById('chat-status').textContent = '✓ record saved';
+      document.getElementById('chat-status').className = 'chat-status found';
+      setTimeout(() => { statusEl.className = 'save-status'; }, 3000);
+    })
+    .catch(err => {
+      statusEl.textContent = '✗ ' + err.message;
+      statusEl.className = 'save-status error';
+    });
+}
+
+// ── Clear form ─────────────────────────────────────
+function clearForm() {
+  FIELDS.forEach(([fId]) => { document.getElementById(fId).value = ''; });
+  isUrgent = false;
+  document.getElementById('urgent-track').classList.remove('on');
+  document.getElementById('urgent-badge').classList.remove('visible');
+  document.getElementById('p-urgent').classList.remove('visible');
+  syncPreview();
+}
+
+// ── Init ───────────────────────────────────────────
+syncPreview();
+updateChatLink();
+</script>
+</body>
+</html>
