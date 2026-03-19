@@ -379,6 +379,13 @@
       </div>
     </div>
 
+    <div class="form-grid single" style="margin-top:16px">
+      <div class="field">
+        <label>Chat Password</label>
+        <input type="text" id="f-password" placeholder="Leave blank for no password" autocomplete="off">
+      </div>
+    </div>
+
     <div style="margin-top:16px">
       <div class="urgent-toggle" onclick="toggleUrgent()">
         <div class="toggle-track" id="urgent-track"></div>
@@ -572,6 +579,7 @@ function loadChat() {
         const el = document.getElementById(fId);
         el.value = data[key] || '';
       });
+      document.getElementById('f-password').value = data.password || '';
       isUrgent = !!data.urgent;
       document.getElementById('urgent-track').classList.toggle('on', isUrgent);
       document.getElementById('urgent-badge').classList.toggle('visible', isUrgent);
@@ -589,18 +597,25 @@ function loadChat() {
 // ── Update chat link in preview ────────────────────
 function updateChatLink() {
   const chatId = document.getElementById('chat-id').value.trim() || 'general';
+  const pw = document.getElementById('f-password').value.trim();
   const link = document.getElementById('open-chat-link');
-  link.href = 'chat.html?chat=' + encodeURIComponent(chatId);
-  link.textContent = '→ Open chat: ' + chatId;
+  const pwParam = pw ? '&password=' + encodeURIComponent(pw) : '';
+  link.href = 'chat.html?chat=' + encodeURIComponent(chatId) + pwParam;
+  link.textContent = pw
+    ? '→ Open chat: ' + chatId + ' (with password)'
+    : '→ Open chat: ' + chatId;
 }
 document.getElementById('chat-id').addEventListener('input', updateChatLink);
+document.getElementById('f-password').addEventListener('input', updateChatLink);
 
 // ── Save to Firebase ───────────────────────────────
 function saveData() {
   const chatId = document.getElementById('chat-id').value.trim();
   if (!chatId) { alert('Please enter a Chat ID first.'); return; }
 
+  const password = document.getElementById('f-password').value.trim();
   const payload = { urgent: isUrgent };
+  if (password) payload.password = password;
   FIELDS.forEach(([fId,, key]) => {
     payload[key] = document.getElementById(fId).value.trim();
   });
@@ -625,6 +640,7 @@ function saveData() {
 // ── Clear form ─────────────────────────────────────
 function clearForm() {
   FIELDS.forEach(([fId]) => { document.getElementById(fId).value = ''; });
+  document.getElementById('f-password').value = '';
   isUrgent = false;
   document.getElementById('urgent-track').classList.remove('on');
   document.getElementById('urgent-badge').classList.remove('visible');
