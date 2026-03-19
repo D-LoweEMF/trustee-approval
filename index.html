@@ -150,6 +150,36 @@
   .doc-content { transition: opacity 0.2s; }
   .doc-content.faded { opacity: 0.25; }
 
+  /* Password gate — covers entire viewport */
+  .pw-gate {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--bg);
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+  }
+  .pw-gate.visible { display: flex; }
+  .pw-gate-box {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 40px 48px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+  }
+  .pw-gate-icon {
+    font-size: 28px; margin-bottom: 16px; color: var(--border2);
+  }
+  .pw-gate-title {
+    font-family: var(--mono); font-size: 13px; font-weight: 500;
+    color: var(--text); margin-bottom: 8px;
+  }
+  .pw-gate-msg {
+    font-family: var(--font); font-size: 13px;
+    color: var(--text2); line-height: 1.6;
+  }
+
   /* ═══════════════════════════════════════════
      RIGHT PANEL — Chat
   ═══════════════════════════════════════════ */
@@ -359,6 +389,15 @@
 </head>
 <body>
 
+<!-- Password gate overlay -->
+<div class="pw-gate" id="pw-gate">
+  <div class="pw-gate-box">
+    <div class="pw-gate-icon">🔒</div>
+    <div class="pw-gate-title">Access restricted</div>
+    <div class="pw-gate-msg">Password not correct, please check and try again.</div>
+  </div>
+</div>
+
 <!-- ═══════════════════ LEFT: Document Panel ═══════════════════ -->
 <div class="doc-panel">
   <div class="doc-inner">
@@ -475,6 +514,7 @@ let openReplyId = null;
 let cachedMsgs = [];
 let currentListener = null;
 let approvalListener = null;
+let urlPassword = ''; // read once from query string on init
 
 // ── Colour palette ─────────────────────────────────
 const COLORS = [
@@ -578,7 +618,17 @@ function attachApprovalListener() {
   if (approvalListener) { approvalListener.off(); }
   approvalListener = db.ref('boardApprovals/' + currentChat);
   approvalListener.on('value', snap => {
-    renderApproval(snap.val());
+    const data = snap.val();
+    const storedPassword = data && data.password ? data.password : '';
+
+    // If the record has a password and the URL password doesn't match, gate the page
+    if (storedPassword && storedPassword !== urlPassword) {
+      document.getElementById('pw-gate').classList.add('visible');
+      return;
+    }
+
+    document.getElementById('pw-gate').classList.remove('visible');
+    renderApproval(data);
   });
 }
 
@@ -751,6 +801,7 @@ function downloadJSON() {
   const p = new URLSearchParams(window.location.search);
   if (p.get('chat')) { currentChat = p.get('chat'); document.getElementById('sim-chat').value = currentChat; }
   if (p.get('user')) { currentUser = p.get('user'); document.getElementById('sim-user').value = currentUser; }
+  urlPassword = p.get('password') || '';
   applyContext();
 })();
 </script>
