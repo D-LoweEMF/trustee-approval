@@ -34,8 +34,131 @@
     color: var(--text);
     height: 100dvh;
     display: flex;
+    flex-direction: row;
+    overflow: hidden;
+  }
+
+  /* ═══════════════════════════════════════════
+     LEFT PANEL — Board Approval Document
+  ═══════════════════════════════════════════ */
+  .doc-panel {
+    width: 50%;
+    flex-shrink: 0;
+    background: #ffffff;
+    border-right: 1px solid var(--border2);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+  .doc-panel::-webkit-scrollbar { width: 4px; }
+  .doc-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .doc-inner {
+    padding: 48px 56px 64px;
+    min-height: 100%;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #111;
+  }
+
+  .emf-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 48px;
+  }
+  .emf-wordmark {
+    font-family: var(--font);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #1a2a4a;
+    line-height: 1.3;
+  }
+
+  .doc-title {
+    text-align: center;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 15px;
+    font-weight: bold;
+    text-decoration: underline;
+    margin-bottom: 32px;
+    color: #111;
+  }
+
+  .doc-field {
+    margin-bottom: 14px;
+    font-size: 14px;
+    color: #111;
+  }
+  .doc-field strong { font-weight: bold; }
+
+  /* value spans — empty state styling */
+  .doc-val:empty::after {
+    content: '—';
+    color: #bbb;
+    font-style: italic;
+  }
+
+  .doc-urgent-row {
+    margin-bottom: 28px;
+    margin-top: 2px;
+    font-size: 14px;
+  }
+  .doc-urgent-label {
+    font-weight: bold;
+    display: none; /* shown only when urgent = true */
+  }
+  .doc-urgent-label.visible { display: inline; }
+
+  .doc-section {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 14px;
+    font-weight: bold;
+    text-decoration: underline;
+    margin-top: 28px;
+    margin-bottom: 18px;
+    color: #111;
+  }
+
+  .doc-divider {
+    border: none;
+    border-top: 1px solid #ccc;
+    margin: 28px 0;
+  }
+
+  /* no-data state */
+  .doc-no-data {
+    display: none;
+    margin-top: 40px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text3);
+    line-height: 1.8;
+  }
+  .doc-no-data.visible { display: block; }
+  .doc-no-data a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .doc-no-data a:hover { text-decoration: underline; }
+  .doc-content { transition: opacity 0.2s; }
+  .doc-content.faded { opacity: 0.25; }
+
+  /* ═══════════════════════════════════════════
+     RIGHT PANEL — Chat
+  ═══════════════════════════════════════════ */
+  .chat-panel {
+    flex: 1;
+    display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-width: 0;
   }
 
   .header {
@@ -54,7 +177,6 @@
   }
   .header-user span { color: var(--accent); }
 
-  /* connection status dot */
   .conn-dot {
     width: 7px; height: 7px; border-radius: 50%;
     background: var(--border2); flex-shrink: 0;
@@ -237,42 +359,97 @@
 </head>
 <body>
 
-<div class="url-bar">
-  <label>chat</label>
-  <input id="sim-chat" value="general" maxlength="30">
-  <label>user</label>
-  <input id="sim-user" value="alice" maxlength="20">
-  <button onclick="applyContext()">apply</button>
-  <div class="url-display" id="url-display">?chat=<span>general</span>&amp;user=<span>alice</span></div>
-</div>
+<!-- ═══════════════════ LEFT: Document Panel ═══════════════════ -->
+<div class="doc-panel">
+  <div class="doc-inner">
 
-<div class="header">
-  <span class="header-hash">#</span>
-  <span class="header-name" id="header-name">general</span>
-  <div class="conn-dot" id="conn-dot" title="Connecting…"></div>
-  <span class="header-user">viewing as <span id="header-user">alice</span></span>
-  <button class="admin-dl" id="admin-dl" onclick="downloadJSON()" style="display:none">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    export JSON
-  </button>
-</div>
-
-<div class="messages" id="messages">
-  <div class="empty"><div class="empty-hash">#</div>connecting…</div>
-</div>
-
-<div class="composer">
-  <div class="composer-inner">
-    <textarea class="composer-input" id="main-input" placeholder="Message #general…" rows="1"></textarea>
-    <button class="composer-send" id="send-btn" onclick="sendMain()" disabled>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+    <div class="emf-logo">
+      <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="26" cy="26" r="24.5" stroke="#1a2a4a" stroke-width="2.2" fill="none"/>
+        <circle cx="26" cy="26" r="17" stroke="#1a2a4a" stroke-width="1.4" fill="none"/>
+        <circle cx="26" cy="26" r="9" fill="#1a2a4a"/>
+        <circle cx="26" cy="26" r="5.5" fill="white"/>
+        <path d="M 19 4.5 A 24.5 24.5 0 0 1 33 4.5" stroke="white" stroke-width="3" fill="none"/>
       </svg>
-    </button>
+      <div class="emf-wordmark">Ellen MacArthur<br>Foundation</div>
+    </div>
+
+    <div class="doc-title">Request for Board Approval</div>
+
+    <!-- No-data notice (shown when chat has no approval record) -->
+    <div class="doc-no-data" id="doc-no-data">
+      No approval record found for this chat.<br><br>
+      <a href="admin.html" target="_blank">→ Open the data entry page</a> to add one.
+    </div>
+
+    <!-- Document content (faded when no data) -->
+    <div class="doc-content" id="doc-content">
+      <div class="doc-field"><strong>Type:</strong> <span class="doc-val" id="val-type"></span></div>
+      <div class="doc-field"><strong>Payment type:</strong> <span class="doc-val" id="val-paymentType"></span></div>
+      <div class="doc-field"><strong>Payment amount:</strong> <span class="doc-val" id="val-paymentAmount"></span></div>
+      <div class="doc-field"><strong>Reason for escalation to Board:</strong> <span class="doc-val" id="val-escalationReason"></span></div>
+      <div class="doc-field"><strong>Decision required by (if time sensitive):</strong> <span class="doc-val" id="val-decisionBy"></span></div>
+      <div class="doc-urgent-row">
+        <span class="doc-urgent-label" id="val-urgent">Urgent!</span>
+      </div>
+
+      <hr class="doc-divider">
+
+      <div class="doc-section">Summary of Business Opportunity</div>
+
+      <div class="doc-field"><strong>Organisation name:</strong> <span class="doc-val" id="val-orgName"></span></div>
+      <div class="doc-field"><strong>Organisation type:</strong> <span class="doc-val" id="val-orgType"></span></div>
+      <div class="doc-field"><strong>Jurisdiction:</strong> <span class="doc-val" id="val-jurisdiction"></span></div>
+      <div class="doc-field"><strong>Organisation overview / business description:</strong> <span class="doc-val" id="val-orgOverview"></span></div>
+      <div class="doc-field"><strong>Overview:</strong> <span class="doc-val" id="val-opportunityOverview"></span></div>
+      <div class="doc-field"><strong>Focus area / Strategic link:</strong> <span class="doc-val" id="val-focusArea"></span></div>
+      <div class="doc-field"><strong>Due Diligence:</strong> <span class="doc-val" id="val-dueDiligence"></span></div>
+      <div class="doc-field"><strong>Contractual:</strong> <span class="doc-val" id="val-contractual"></span></div>
+    </div>
+
   </div>
 </div>
 
-<!-- Firebase SDK (compat version — works with simple global syntax) -->
+<!-- ═══════════════════ RIGHT: Chat Panel ═══════════════════ -->
+<div class="chat-panel">
+
+  <div class="url-bar">
+    <label>chat</label>
+    <input id="sim-chat" value="general" maxlength="30">
+    <label>user</label>
+    <input id="sim-user" value="alice" maxlength="20">
+    <button onclick="applyContext()">apply</button>
+    <div class="url-display" id="url-display">?chat=<span>general</span>&amp;user=<span>alice</span></div>
+  </div>
+
+  <div class="header">
+    <span class="header-hash">#</span>
+    <span class="header-name" id="header-name">general</span>
+    <div class="conn-dot" id="conn-dot" title="Connecting…"></div>
+    <span class="header-user">viewing as <span id="header-user">alice</span></span>
+    <button class="admin-dl" id="admin-dl" onclick="downloadJSON()" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      export JSON
+    </button>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="empty"><div class="empty-hash">#</div>connecting…</div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-inner">
+      <textarea class="composer-input" id="main-input" placeholder="Message #general…" rows="1"></textarea>
+      <button class="composer-send" id="send-btn" onclick="sendMain()" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
@@ -295,8 +472,9 @@ const db = firebase.database();
 let currentChat = 'general';
 let currentUser = 'alice';
 let openReplyId = null;
-let cachedMsgs = [];        // local copy kept in sync by onValue listener
-let currentListener = null; // reference to active Firebase listener so we can detach it
+let cachedMsgs = [];
+let currentListener = null;
+let approvalListener = null;
 
 // ── Colour palette ─────────────────────────────────
 const COLORS = [
@@ -345,12 +523,71 @@ function setConnected(ok) {
   document.getElementById('send-btn').disabled = !ok;
 }
 
+// ── Board Approval panel ───────────────────────────
+// Maps Firebase field keys → DOM element IDs
+const FIELD_MAP = {
+  type:                'val-type',
+  paymentType:         'val-paymentType',
+  paymentAmount:       'val-paymentAmount',
+  escalationReason:    'val-escalationReason',
+  decisionBy:          'val-decisionBy',
+  orgName:             'val-orgName',
+  orgType:             'val-orgType',
+  jurisdiction:        'val-jurisdiction',
+  orgOverview:         'val-orgOverview',
+  opportunityOverview: 'val-opportunityOverview',
+  focusArea:           'val-focusArea',
+  dueDiligence:        'val-dueDiligence',
+  contractual:         'val-contractual',
+};
+
+function renderApproval(data) {
+  const noData = document.getElementById('doc-no-data');
+  const content = document.getElementById('doc-content');
+
+  if (!data) {
+    noData.classList.add('visible');
+    content.classList.add('faded');
+    // Clear all values
+    Object.values(FIELD_MAP).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '';
+    });
+    document.getElementById('val-urgent').classList.remove('visible');
+    return;
+  }
+
+  noData.classList.remove('visible');
+  content.classList.remove('faded');
+
+  Object.entries(FIELD_MAP).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = data[key] || '';
+  });
+
+  // Urgent flag
+  const urgentEl = document.getElementById('val-urgent');
+  if (data.urgent) {
+    urgentEl.classList.add('visible');
+  } else {
+    urgentEl.classList.remove('visible');
+  }
+}
+
+function attachApprovalListener() {
+  if (approvalListener) { approvalListener.off(); }
+  approvalListener = db.ref('boardApprovals/' + currentChat);
+  approvalListener.on('value', snap => {
+    renderApproval(snap.val());
+  });
+}
+
 // ── Build & render HTML from cached messages ───────
 function buildHTML(msgs) {
   if (!msgs.length) {
     return `<div class="empty"><div class="empty-hash">#</div>${currentChat}<div style="margin-top:4px;font-size:11px">no messages yet</div></div>`;
   }
-  return msgs.slice().sort((a, b) => b.ts - a.ts).map(msg => {
+  return msgs.slice().sort((a, b) => a.ts - b.ts).map(msg => {
     const isMine = msg.user === currentUser;
     const c = colorFor(msg.user);
     const replies = (msg.replies || []).slice().sort((a, b) => a.ts - b.ts);
@@ -399,32 +636,25 @@ function buildHTML(msgs) {
 }
 
 function render() {
-  // Only block re-render if the user is actively mid-type in a reply box
   const active = document.activeElement;
   if (active && active.classList.contains('reply-input') && active.value.trim().length > 0) return;
-
-  document.getElementById('messages').innerHTML = buildHTML(cachedMsgs);
-
+  const messagesEl = document.getElementById('messages');
+  messagesEl.innerHTML = buildHTML(cachedMsgs);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
   if (openReplyId) {
     setTimeout(() => document.getElementById('ri-' + openReplyId)?.focus(), 20);
   }
 }
 
 // ── Firebase listener ──────────────────────────────
-// Called every time the current chat's data changes in Firebase.
-// Converts the Firebase object (keyed by push ID) into our flat array.
 function attachListener() {
-  // Detach any previous listener
   if (currentListener) { currentListener.off(); }
-
   const ref = dbRef();
   currentListener = ref;
-
   ref.on('value',
     snapshot => {
       setConnected(true);
       const data = snapshot.val() || {};
-      // Convert {pushId: msgObject} → array, preserving replies array
       cachedMsgs = Object.entries(data).map(([firebaseKey, msg]) => ({
         id: firebaseKey,
         user: msg.user,
@@ -434,16 +664,9 @@ function attachListener() {
       }));
       render();
     },
-    err => {
-      console.error('Firebase error:', err);
-      setConnected(false);
-    }
+    err => { console.error('Firebase error:', err); setConnected(false); }
   );
-
-  // Monitor connection state
-  db.ref('.info/connected').on('value', snap => {
-    setConnected(snap.val() === true);
-  });
+  db.ref('.info/connected').on('value', snap => { setConnected(snap.val() === true); });
 }
 
 // ── Send main message ──────────────────────────────
@@ -451,15 +674,7 @@ function sendMain() {
   const input = document.getElementById('main-input');
   const text = input.value.trim();
   if (!text) return;
-
-  // push() generates a unique Firebase key and writes the message
-  dbRef().push({
-    user: currentUser,
-    text: text,
-    ts: Date.now(),
-    replies: {}
-  });
-
+  dbRef().push({ user: currentUser, text: text, ts: Date.now(), replies: {} });
   input.value = '';
   input.style.height = '';
 }
@@ -471,41 +686,25 @@ function toggleReply(id) {
   if (openReplyId) setTimeout(() => document.getElementById('ri-' + openReplyId)?.focus(), 30);
 }
 
-function closeReply(id) {
-  openReplyId = null;
-  render();
-}
+function closeReply(id) { openReplyId = null; render(); }
 
 function sendReply(id) {
   const input = document.getElementById('ri-' + id);
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-
-  // Write the reply into chats/{chat}/{messageId}/replies/
-  dbRef().child(id + '/replies').push({
-    user: currentUser,
-    text: text,
-    ts: Date.now()
-  });
-
+  dbRef().child(id + '/replies').push({ user: currentUser, text: text, ts: Date.now() });
   openReplyId = id;
-  // Clear the textarea immediately (Firebase will trigger re-render via onValue)
   input.value = '';
   input.style.height = '';
   input.focus();
 }
 
 function replyKeydown(e, id) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    e.target.blur(); // release focus so the render guard doesn't block the update
-    sendReply(id);
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.target.blur(); sendReply(id); }
   if (e.key === 'Escape') closeReply(id);
 }
 
-// ── Auto-resize textareas ──────────────────────────
 document.addEventListener('input', e => {
   if (e.target.tagName === 'TEXTAREA') {
     e.target.style.height = 'auto';
@@ -532,7 +731,8 @@ function applyContext() {
   cachedMsgs = [];
   document.getElementById('messages').innerHTML =
     `<div class="empty"><div class="empty-hash">#</div>connecting…</div>`;
-  attachListener(); // re-subscribe to the new chat path
+  attachListener();
+  attachApprovalListener();
 }
 
 // ── Admin export ───────────────────────────────────
@@ -542,13 +742,11 @@ function downloadJSON() {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = currentChat + '_' + new Date().toISOString().slice(0, 10) + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
+  a.href = url; a.download = currentChat + '_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click(); URL.revokeObjectURL(url);
 }
 
-// ── Init: read query string, then connect ──────────
+// ── Init ──────────────────────────────────────────
 (function () {
   const p = new URLSearchParams(window.location.search);
   if (p.get('chat')) { currentChat = p.get('chat'); document.getElementById('sim-chat').value = currentChat; }
