@@ -351,29 +351,56 @@
   .composer-send:disabled { opacity: 0.4; cursor: default; }
   .composer-send svg { width: 16px; height: 16px; }
 
-  .url-bar {
-    background: var(--surface2); border-bottom: 1px solid var(--border);
-    padding: 8px 20px;
-    display: flex; gap: 8px; align-items: center;
-    flex-shrink: 0; flex-wrap: wrap;
+  .url-bar { display: none; }
+
+  /* ── Approval bar ── */
+  .approval-bar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px 20px;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
   }
-  .url-bar label { font-family: var(--mono); font-size: 10px; color: var(--text3); }
-  .url-bar input {
-    font-family: var(--mono); font-size: 11px;
-    background: var(--surface); border: 1px solid var(--border2);
-    border-radius: 4px; padding: 3px 8px; color: var(--text);
-    outline: none; width: 90px;
+  .approval-question {
+    font-size: 13px; font-weight: 500; color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
   }
-  .url-bar input:focus { border-color: var(--accent-border); }
-  .url-bar button {
-    font-family: var(--mono); font-size: 10px;
-    background: var(--surface); border: 1px solid var(--border2);
-    border-radius: 4px; color: var(--text2);
-    padding: 3px 10px; cursor: pointer; transition: color 0.15s;
+  .approval-question svg { color: var(--text3); }
+  .approval-btns { display: flex; gap: 8px; flex-shrink: 0; }
+  .approval-btn {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    border-radius: 6px; padding: 6px 18px;
+    cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+    letter-spacing: 0.02em;
   }
-  .url-bar button:hover { color: var(--accent); border-color: var(--accent-border); }
-  .url-display { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-left: auto; }
-  .url-display span { color: var(--accent); }
+  .approval-btn.yes {
+    background: rgba(20,140,80,0.07);
+    border: 1.5px solid rgba(20,140,80,0.3);
+    color: #0f7a44;
+  }
+  .approval-btn.yes:hover { background: rgba(20,140,80,0.14); }
+  .approval-btn.yes.active {
+    background: #0f7a44; border-color: #0f7a44; color: #fff;
+  }
+  .approval-btn.no {
+    background: rgba(200,70,40,0.07);
+    border: 1.5px solid rgba(200,70,40,0.3);
+    color: #b03820;
+  }
+  .approval-btn.no:hover { background: rgba(200,70,40,0.14); }
+  .approval-btn.no.active {
+    background: #b03820; border-color: #b03820; color: #fff;
+  }
+  .approval-tally {
+    font-family: var(--mono); font-size: 10px; color: var(--text3);
+    margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .tally-yes { color: #0f7a44; }
+  .tally-no  { color: #b03820; }
 
   .admin-dl {
     display: flex; align-items: center; gap: 5px;
@@ -466,10 +493,29 @@
     <span class="header-name" id="header-name">general</span>
     <div class="conn-dot" id="conn-dot" title="Connecting…"></div>
     <span class="header-user">viewing as <span id="header-user">alice</span></span>
-    <button class="admin-dl" id="admin-dl" onclick="downloadJSON()" style="display:none">
+    <button class="admin-dl" id="admin-dl" onclick="downloadJSON()" style="display:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       export JSON
     </button>
+  </div>
+
+  <!-- Approval bar -->
+  <div class="approval-bar" id="approval-bar">
+    <div class="approval-question">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      I approve this request
+    </div>
+    <div class="approval-btns">
+      <button class="approval-btn yes" id="btn-yes" onclick="castVote('yes')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
+        Yes
+      </button>
+      <button class="approval-btn no" id="btn-no" onclick="castVote('no')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        No
+      </button>
+    </div>
+    <div class="approval-tally" id="approval-tally"></div>
   </div>
 
   <div class="messages" id="messages">
@@ -514,6 +560,7 @@ let openReplyId = null;
 let cachedMsgs = [];
 let currentListener = null;
 let approvalListener = null;
+let votesListener = null;
 let urlPassword = ''; // read once from query string on init
 
 // ── Colour palette ─────────────────────────────────
@@ -612,6 +659,53 @@ function renderApproval(data) {
   } else {
     urgentEl.classList.remove('visible');
   }
+}
+
+// ── Approval votes ─────────────────────────────────
+function castVote(decision) {
+  // Record the vote in Firebase
+  db.ref('boardApprovals/' + currentChat + '/votes/' + currentUser).set({
+    decision: decision,
+    ts: Date.now()
+  });
+
+  // Post a message to the chat
+  const now = new Date();
+  const dateStr = now.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const text = decision === 'yes'
+    ? `Approved on ${dateStr} at ${timeStr}`
+    : `Rejected on ${dateStr} at ${timeStr}`;
+  dbRef().push({ user: currentUser, text: text, ts: Date.now(), replies: {} });
+}
+
+function renderVotes(votes) {
+  const myVote = votes[currentUser] ? votes[currentUser].decision : null;
+
+  document.getElementById('btn-yes').classList.toggle('active', myVote === 'yes');
+  document.getElementById('btn-no').classList.toggle('active', myVote === 'no');
+
+  const yesVoters = Object.entries(votes).filter(([, v]) => v.decision === 'yes').map(([u]) => u);
+  const noVoters  = Object.entries(votes).filter(([, v]) => v.decision === 'no').map(([u]) => u);
+
+  const tally = document.getElementById('approval-tally');
+  tally.innerHTML = [
+    yesVoters.length ? `<span class="tally-yes">✓ ${yesVoters.join(', ')}</span>` : '',
+    noVoters.length  ? `<span class="tally-no">✗ ${noVoters.join(', ')}</span>`  : '',
+  ].filter(Boolean).join('');
+}
+
+function attachVotesListener() {
+  if (votesListener) { votesListener.off(); }
+  // Clear state immediately when switching chats
+  document.getElementById('btn-yes').classList.remove('active');
+  document.getElementById('btn-no').classList.remove('active');
+  document.getElementById('approval-tally').innerHTML = '';
+
+  votesListener = db.ref('boardApprovals/' + currentChat + '/votes');
+  votesListener.on('value', snap => {
+    renderVotes(snap.val() || {});
+  });
 }
 
 function attachApprovalListener() {
@@ -783,6 +877,7 @@ function applyContext() {
     `<div class="empty"><div class="empty-hash">#</div>connecting…</div>`;
   attachListener();
   attachApprovalListener();
+  attachVotesListener();
 }
 
 // ── Admin export ───────────────────────────────────
