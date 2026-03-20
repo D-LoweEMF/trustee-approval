@@ -402,6 +402,59 @@
   .tally-yes { color: #0f7a44; }
   .tally-no  { color: #b03820; }
 
+  /* ── Flag button ── */
+  .msg-bubble-wrap {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+  }
+  .msg-bubble-wrap.flagged .msg-bubble {
+    border-color: #c04020;
+    box-shadow: 0 0 0 2px rgba(192,64,32,0.15);
+  }
+  .flag-btn {
+    position: absolute;
+    top: -7px; right: -7px;
+    width: 20px; height: 20px;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, border-color 0.15s;
+    z-index: 2;
+  }
+  .flag-btn svg { width: 10px; height: 10px; color: var(--text3); transition: color 0.15s; }
+  .msg-row:hover .flag-btn,
+  .flag-btn.flagged { opacity: 1; }
+  .flag-btn.flagged { border-color: rgba(192,64,32,0.4); background: rgba(192,64,32,0.06); }
+  .flag-btn.flagged svg { color: #c04020; fill: #c04020; }
+
+  /* Flag dropdown menu */
+  .flag-menu {
+    position: absolute;
+    top: 16px; right: -4px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    z-index: 100;
+    min-width: 172px;
+    overflow: hidden;
+    display: none;
+  }
+  .flag-menu.open { display: block; }
+  .flag-menu-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 13px;
+    font-size: 12px; font-family: var(--font); color: var(--text);
+    cursor: pointer; transition: background 0.12s;
+    white-space: nowrap; border: none; background: none; width: 100%;
+    text-align: left;
+  }
+  .flag-menu-item:hover { background: var(--surface2); }
+  .flag-menu-item svg { color: #c04020; flex-shrink: 0; }
+
   .admin-dl {
     display: flex; align-items: center; gap: 5px;
     font-family: var(--mono); font-size: 11px; font-weight: 500;
@@ -562,6 +615,7 @@ let currentListener = null;
 let approvalListener = null;
 let votesListener = null;
 let urlPassword = ''; // read once from query string on init
+let openFlagMenuId = null;
 
 // ── Colour palette ─────────────────────────────────
 const COLORS = [
@@ -726,6 +780,21 @@ function attachApprovalListener() {
   });
 }
 
+// ── Flag functions ─────────────────────────────────
+function toggleFlagMenu(id) {
+  openFlagMenuId = (openFlagMenuId === id) ? null : id;
+  render();
+}
+
+function flagMessage(id) {
+  openFlagMenuId = null;
+  db.ref('chats/' + currentChat + '/' + id + '/flagged').set(true);
+}
+
+function unflagMessage(id) {
+  db.ref('chats/' + currentChat + '/' + id + '/flagged').set(false);
+}
+
 // ── Build & render HTML from cached messages ───────
 function buildHTML(msgs) {
   if (!msgs.length) {
@@ -752,6 +821,8 @@ function buildHTML(msgs) {
       }).join('')}</div>` : '';
 
     const isOpen = openReplyId === msg.id;
+    const isFlagged = msg.flagged || false;
+    const flagMenuOpen = openFlagMenuId === msg.id;
     return `<div class="thread" id="thread-${msg.id}">
       <div class="msg-row ${isMine ? 'mine' : 'theirs'}">
         ${avatarHTML(msg.user, 'lg')}
@@ -760,7 +831,22 @@ function buildHTML(msgs) {
             <span class="msg-author" style="color:${c.text}">${msg.user}</span>
             <span class="msg-time">${formatTime(msg.ts)}</span>
           </div>
-          <div class="msg-bubble">${escHtml(msg.text)}</div>
+          <div class="msg-bubble-wrap ${isFlagged ? 'flagged' : ''}">
+            <div class="msg-bubble">${escHtml(msg.text)}</div>
+            <button class="flag-btn ${isFlagged ? 'flagged' : ''}"
+              onclick="${isFlagged ? `unflagMessage('${msg.id}')` : `toggleFlagMenu('${msg.id}')`}"
+              title="${isFlagged ? 'Remove flag' : 'Flag message'}">
+              <svg viewBox="0 0 24 24" fill="${isFlagged ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              </svg>
+            </button>
+            <div class="flag-menu ${flagMenuOpen ? 'open' : ''}" id="fm-${msg.id}">
+              <button class="flag-menu-item" onclick="flagMessage('${msg.id}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                Mark as requires response
+              </button>
+            </div>
+          </div>
           <div class="msg-actions">
             <button class="reply-btn ${isOpen ? 'active' : ''}" onclick="toggleReply('${msg.id}')">↩ reply</button>
           </div>
@@ -804,6 +890,7 @@ function attachListener() {
         user: msg.user,
         text: msg.text,
         ts: msg.ts,
+        flagged: msg.flagged || false,
         replies: msg.replies ? Object.values(msg.replies) : []
       }));
       render();
@@ -853,6 +940,14 @@ document.addEventListener('input', e => {
   if (e.target.tagName === 'TEXTAREA') {
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+  }
+});
+
+// Close flag menu when clicking outside
+document.addEventListener('click', e => {
+  if (openFlagMenuId && !e.target.closest('.msg-bubble-wrap')) {
+    openFlagMenuId = null;
+    render();
   }
 });
 
